@@ -1,5 +1,5 @@
 # NeuralEnhance
-train/
+# train/
 valid/
 *.pkl.bz2
 
@@ -95,3 +95,7 @@ ENV/
 
 # Jet Brains Project Settings
 .idea
+
+# other files
+/input
+/test

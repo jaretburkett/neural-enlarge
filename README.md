@@ -5,6 +5,29 @@ A fork of
 [alexjc/neural-enhance](https://github.com/alexjc/neural-enhance) with
 the goal to simplify usage.
 
+### DOCKER
+
+CPU
+```
+docker build -t jaretburkett/neural-enlarge -f docker-cpu.df .
+```
+
+GPU
+```
+nvidia-docker build -t jaretburkett/neural-enlarge:gpu -f docker-gpu.df .
+```
+
+#### Make an alias
+For Mac or Linux
+Clone the project, cd into the directory.
+```
+NEURAL_ENLARGE_PATH=$(pwd)
+alias enlarge='function ne() { docker run --rm -v "$(pwd)/`dirname ${@:$#}`":/ne/input -v "$NEURAL_ENLARGE_PATH":/ne -it jaretburkett/neural-enlarge ${@:1:$#-1} "input/`basename ${@:$#}`"; }; ne'
+```
+
+OLD NEURAL ENHANCE DOCS
+=======================
+
 Neural Enhance
 ==============
 
@@ -48,7 +71,7 @@ Stars](https://img.shields.io/github/stars/alexjc/neural-enhance.svg?style=flat)
 1. Examples & Usage
 ===================
 
-The main script is called `enhance.py`, which you can run with Python
+The main script is called `enlarge.py`, which you can run with Python
 3.4+ once it's [setup](#2-installation--setup) as below. The `--device`
 argument that lets you specify which GPU or CPU to use. For the samples
 above, here are the performance results:

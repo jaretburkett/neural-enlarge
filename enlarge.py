@@ -53,7 +53,7 @@ add_arg('--rendering-tile', default=80, type=int, help='Size of tiles used for r
 add_arg('--rendering-overlap', default=24, type=int, help='Number of pixels padding around each tile.')
 add_arg('--rendering-histogram', default=False, action='store_true', help='Match color histogram of output to input.')
 add_arg('--type', default='photo', type=str, help='Name of the neural network to load/save.')
-add_arg('--model', default='default', type=str, help='Specific trained version of the model.')
+add_arg('--model', default='enlarge', type=str, help='Specific trained version of the model.')
 add_arg('--train', default=False, type=str, help='File pattern to load for training.')
 add_arg('--train-scales', default=0, type=int, help='Randomly resize images this many times.')
 add_arg('--train-blur', default=None, type=int, help='Sigma value for gaussian blur preprocess.')
@@ -373,10 +373,10 @@ class Model(object):
     def load_perceptual(self):
         """Open the serialized parameters from a pre-trained network, and load them into the model created.
         """
-        vgg19_file = os.path.join(os.path.dirname(__file__), 'vgg19_conv.pkl.bz2')
+        vgg19_file = os.path.join(os.path.dirname(__file__), 'models/vgg19_conv.pkl.bz2')
         if not os.path.exists(vgg19_file):
             error("Model file with pre-trained convolution layers not found. Download here...",
-                  "https://github.com/alexjc/neural-doodle/releases/download/v0.0/vgg19_conv.pkl.bz2")
+                  "https://github.com/jaretburkett/neural-enlarge/releases/download/v0.0/vgg19_conv.pkl.bz2")
 
         data = pickle.load(bz2.open(vgg19_file, 'rb'))
         layers = lasagne.layers.get_all_layers(self.last_layer(), treat_as_input=[self.network['percept']])
@@ -389,7 +389,7 @@ class Model(object):
             yield (name, l)
 
     def get_filename(self, absolute=False):
-        filename = 'ne%ix-%s-%s-%s.pkl.bz2' % (args.zoom, args.type, args.model, __version__)
+        filename = 'models/ne%ix-%s-%s-%s.pkl.bz2' % (args.zoom, args.type, args.model, __version__)
         return os.path.join(os.path.dirname(__file__), filename) if absolute else filename
 
     def save_generator(self):
@@ -406,7 +406,7 @@ class Model(object):
         if not os.path.exists(self.get_filename(absolute=True)):
             if args.train: return {}, {}
             error("Model file with pre-trained convolution layers not found. Download it here...",
-                  "https://github.com/alexjc/neural-enhance/releases/download/v%s/%s" % (
+                  "https://github.com/jaretburkett/neural-enlarge/releases/download/v%s/%s" % (
                   __version__, self.get_filename()))
         print('  - Loaded file `{}` with trained model.'.format(self.get_filename()))
         return pickle.load(bz2.open(self.get_filename(absolute=True), 'rb'))
