@@ -608,6 +608,6 @@ if __name__ == "__main__":
             print(filename, end=' ')
             img = scipy.ndimage.imread(filename, mode='RGB')
             out = enhancer.process(img)
-            out.save(os.path.splitext(filename)[0] + '_ne%ix.png' % args.zoom)
+            out.save(os.path.splitext(filename)[0] + '_ne%ix_%s.png' % (args.zoom, args.model))
             print(flush=True)
         print(ansi.ENDC)
