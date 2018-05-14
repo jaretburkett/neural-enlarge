@@ -195,7 +195,7 @@ class DataLoader(threading.Thread):
             return
 
         if args.train_magic is not 0:
-            orig = magic.random_flip(img)
+            orig = magic.random_flip(orig)
 
         seed = orig
 
