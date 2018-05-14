@@ -18,10 +18,14 @@ RUN wget --quiet https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86
 WORKDIR /ne
 COPY requirements.txt .
 RUN /opt/conda/bin/conda install -q -y conda numpy scipy pip pillow
-RUN /opt/conda/bin/python3.5 -m pip install -q -r "requirements.txt"
+RUN /opt/conda/bin/python3 -m pip install -q -r "requirements.txt"
+RUN /opt/conda/bin/python3 -m pip install opencv-python
+
+RUN apt-get update
+RUN apt-get install -y libsm6 libfontconfig1 libxrender1
 
 # Copy only required project files
 COPY enlarge.py .
 
 # Set an entrypoint to the main enhance.py script
-ENTRYPOINT ["/opt/conda/bin/python3.5", "enlarge.py", "--device=gpu"]
+ENTRYPOINT ["/opt/conda/bin/python3", "enlarge.py", "--device=gpu"]

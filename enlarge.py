@@ -36,6 +36,7 @@ import bz2
 import glob
 import math
 import time
+import magic
 import pickle
 import random
 import argparse
@@ -55,6 +56,7 @@ add_arg('--rendering-histogram', default=False, action='store_true', help='Match
 add_arg('--type', default='photo', type=str, help='Name of the neural network to load/save.')
 add_arg('--model', default='enlarge', type=str, help='Specific trained version of the model.')
 add_arg('--train', default=False, type=str, help='File pattern to load for training.')
+add_arg('--train-magic', default=0, type=int, help='Weight to randomly apply magic filters to training set')
 add_arg('--train-scales', default=5, type=int, help='Randomly resize images this many times.')
 add_arg('--train-blur', default=None, type=int, help='Sigma value for gaussian blur preprocess.')
 add_arg('--train-noise', default=1.0, type=float, help='Radius for preprocessing gaussian blur.')
@@ -193,6 +195,10 @@ class DataLoader(threading.Thread):
             return
 
         seed = orig
+
+        # magic
+        if args.train_magic is not 0:
+            seed = magic.add_random_motion_blur(seed)
         if args.train_blur is not None:
             seed = seed.filter(PIL.ImageFilter.GaussianBlur(radius=random.randint(0, args.train_blur * 2)))
         if args.zoom > 1:

@@ -22,6 +22,10 @@ COPY requirements.txt .
 RUN /opt/conda/bin/conda install -q -y conda numpy scipy pip pillow
 # RUN ls /opt/conda/bin/
 RUN /opt/conda/bin/python3 -m pip install -q -r "requirements.txt"
+RUN /opt/conda/bin/python3 -m pip install opencv-python
+
+RUN apt-get update
+RUN apt-get install -y libsm6 libfontconfig1 libxrender1
 
 # Copy only required project files
 COPY enlarge.py .
