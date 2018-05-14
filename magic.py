@@ -1,8 +1,11 @@
+import io
 import cv2
+import PIL
 import random
 import numpy as np
-import PIL
-from PIL import ImageEnhance
+from PIL import ImageEnhance, ImageFilter, Image
+
+applied_arr = []
 
 
 def pil_to_cv(img):
@@ -16,11 +19,21 @@ def cv_to_pil(img):
     return PIL.Image.fromarray(img)
 
 
+def convert_to_uint8(image_in):
+    temp_image = np.float64(np.copy(image_in))
+    cv2.normalize(temp_image, temp_image, 0, 255, cv2.NORM_MINMAX, dtype=-1)
+    return temp_image.astype(np.uint8)
+
+
 def add_random_motion_blur(img):
+    global applied_arr
 
     cv_img = pil_to_cv(img)
     size = random.randint(1, 10)
     blur_direction = random.randint(0, 3)
+
+    # add to applied string
+    applied_arr.append('mblur%i-%i' % (blur_direction, size))
 
     kernel_motion_blur = np.zeros((size, size))
 
@@ -56,35 +69,137 @@ def add_random_motion_blur(img):
     return cv_to_pil(cv_img)
 
 
+def add_random_blur(img):
+    global applied_arr
+    size = random.randint(0, 2)
+
+    # add to applied string
+    applied_arr.append('blur%i' % size)
+
+    return img.filter(ImageFilter.GaussianBlur(radius=random.randint(0, 2)))
+
+
 def adjust_random_color(img):
+    global applied_arr
     adjust = random.randrange(10, 20)
     adjust = adjust / 15
-    contrast_image = ImageEnhance.Color(img)
-    return contrast_image.enhance(adjust)
+
+    # add to applied string
+    applied_arr.append('color%1.1f' % adjust)
+
+    enhance_image = ImageEnhance.Color(img)
+    return enhance_image.enhance(adjust)
 
 
 def adjust_random_contrast(img):
+    global applied_arr
     adjust = random.randrange(10, 20)
     adjust = adjust / 15
-    contrast_image = ImageEnhance.Contrast(img)
-    return contrast_image.enhance(adjust)
+
+    # add to applied string
+    applied_arr.append('cont%1.1f' % adjust)
+
+    enhance_image = ImageEnhance.Contrast(img)
+    return enhance_image.enhance(adjust)
 
 
 def adjust_random_brightness(img):
+    global applied_arr
     adjust = random.randrange(10, 20)
     adjust = adjust / 15
-    contrast_image = ImageEnhance.Brightness(img)
-    return contrast_image.enhance(adjust)
+
+    # add to applied string
+    applied_arr.append('brig%1.1f' % adjust)
+
+    enhance_image = ImageEnhance.Brightness(img)
+    return enhance_image.enhance(adjust)
 
 
 def adjust_random_sharpness(img):
-    adjust = random.randrange(0, 15)
-    contrast_image = ImageEnhance.Sharpness(img)
-    return contrast_image.enhance(adjust)
+    global applied_arr
+    adjust = random.randrange(1, 6)
+
+    # add to applied string
+    applied_arr.append('sharp%1.1f' % adjust)
+
+    enhance_image = ImageEnhance.Sharpness(img)
+    return enhance_image.enhance(adjust)
 
 
-def random_magic(img):
-    one_in = 3
+def random_jpg_compression(img):
+    global applied_arr
+    quality = random.randint(20, 90)
+
+    # add to applied string
+    applied_arr.append('jpg%i' % quality)
+
+    buffer = io.BytesIO()
+    img.save(buffer, format='jpeg', quality=quality)
+    return Image.open(buffer)
+
+
+def flip_horizontally(img):
+    global applied_arr
+    # add to applied string
+    applied_arr.append('flipH')
+    return img.transpose(Image.FLIP_LEFT_RIGHT)
+
+
+def flip_vertically(img):
+    global applied_arr
+    # add to applied string
+    applied_arr.append('flipV')
+    return img.transpose(Image.FLIP_TOP_BOTTOM)
+
+
+def add_random_noise(img):
+    global applied_arr
+    noise_sigma = random.randint(0, 60)
+    applied_arr.append('noise%i' % noise_sigma)
+    overlay = Image.new('RGBA', img.size)
+    pix = overlay.load()
+    width, height = img.size
+    for x in range(0, width):
+        for y in range(0, height):
+                r = random.randint(0, 255)
+                g = random.randint(0, 255)
+                b = random.randint(0, 255)
+                a = noise_sigma
+                pix[x, y] = (r, g, b, a)
+
+    ret_img = img.copy()
+    ret_img.paste(overlay, (0, 0), overlay)
+    return ret_img
+
+
+def get_applied_arr():
+    global applied_arr
+    return applied_arr
+
+
+def reset_applied_arr():
+    global applied_arr
+    applied_arr = []
+
+
+def random_flip(img):
+    # flip horizontally 50% of time
+    if random.randint(0, 1) == 1:
+        img = flip_horizontally(img)
+
+    # flip vertically 10% of time
+    if random.randint(1, 10) == 1:
+        img = flip_vertically(img)
+
+    return img
+
+
+def random_magic(img, magic_number=5):
+    global applied_arr
+    # how often to apply filters, magic number 0-10
+    one_in = 11 - magic_number
+    # reset applied arr
+    applied_arr = []
 
     # color
     if random.randint(1, one_in) == 1:
@@ -102,9 +217,20 @@ def random_magic(img):
     if random.randint(1, one_in) == 1:
         img = adjust_random_sharpness(img)
 
+    # blur
+    if random.randint(1, one_in) == 1:
+        img = add_random_blur(img)
+
     # motion blur
     if random.randint(1, one_in) == 1:
         img = add_random_motion_blur(img)
+
+    # noise
+    if random.randint(1, one_in) == 1:
+        img = add_random_noise(img)
+
+    # jpg compression, always add
+    img = random_jpg_compression(img)
 
     return img
 

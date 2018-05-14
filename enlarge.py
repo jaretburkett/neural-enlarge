@@ -56,7 +56,7 @@ add_arg('--rendering-histogram', default=False, action='store_true', help='Match
 add_arg('--type', default='photo', type=str, help='Name of the neural network to load/save.')
 add_arg('--model', default='enlarge', type=str, help='Specific trained version of the model.')
 add_arg('--train', default=False, type=str, help='File pattern to load for training.')
-add_arg('--train-magic', default=0, type=int, help='Weight to randomly apply magic filters to training set')
+add_arg('--train-magic', default=6, type=int, help='Frequency of magic filters 0 - 10. 0 = never, 10 = frequently')
 add_arg('--train-scales', default=5, type=int, help='Randomly resize images this many times.')
 add_arg('--train-blur', default=None, type=int, help='Sigma value for gaussian blur preprocess.')
 add_arg('--train-noise', default=1.0, type=float, help='Radius for preprocessing gaussian blur.')
@@ -194,25 +194,30 @@ class DataLoader(threading.Thread):
             self.files.remove(f)
             return
 
+        if args.train_magic is not 0:
+            orig = magic.random_flip(img)
+
         seed = orig
 
-        # magic
-        if args.train_magic is not 0:
-            seed = magic.add_random_motion_blur(seed)
-        if args.train_blur is not None:
-            seed = seed.filter(PIL.ImageFilter.GaussianBlur(radius=random.randint(0, args.train_blur * 2)))
         if args.zoom > 1:
             seed = seed.resize((orig.size[0] // args.zoom, orig.size[1] // args.zoom), resample=PIL.Image.LANCZOS)
-        if len(args.train_jpeg) > 0:
-            buffer, rng = io.BytesIO(), args.train_jpeg[-1] if len(args.train_jpeg) > 1 else 15
-            seed.save(buffer, format='jpeg', quality=args.train_jpeg[0] + random.randrange(-rng, +rng))
-            seed = PIL.Image.open(buffer)
+        # magic
+        if args.train_magic is not 0:
+            seed = magic.random_magic(seed, args.train_magic)
+        else:
+            if args.train_blur is not None:
+                seed = seed.filter(PIL.ImageFilter.GaussianBlur(radius=random.randint(0, args.train_blur * 2)))
+            if len(args.train_jpeg) > 0:
+                buffer, rng = io.BytesIO(), args.train_jpeg[-1] if len(args.train_jpeg) > 1 else 15
+                seed.save(buffer, format='jpeg', quality=args.train_jpeg[0] + random.randrange(-rng, +rng))
+                seed = PIL.Image.open(buffer)
 
         orig = scipy.misc.fromimage(orig).astype(np.float32)
         seed = scipy.misc.fromimage(seed).astype(np.float32)
 
-        if args.train_noise is not None:
-            seed += scipy.random.normal(scale=args.train_noise, size=(seed.shape[0], seed.shape[1], 1))
+        if args.train_magic == 0:
+            if args.train_noise is not None:
+                seed += scipy.random.normal(scale=args.train_noise, size=(seed.shape[0], seed.shape[1], 1))
 
         for _ in range(seed.shape[0] * seed.shape[1] // (args.buffer_fraction * self.seed_shape ** 2)):
             h = random.randint(0, seed.shape[0] - self.seed_shape)
