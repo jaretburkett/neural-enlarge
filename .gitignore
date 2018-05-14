@@ -100,3 +100,5 @@ ENV/
 /input
 /test
 /test.py
+/training_data/*
+!/training_data/.gitkeep
