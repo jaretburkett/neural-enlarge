@@ -535,7 +535,7 @@ class NeuralEnhancer(object):
                     l = np.sum(losses)
                     assert not np.isnan(losses).any()
                     average = l if average is None else average * 0.95 + 0.05 * l
-                    print('↑' if l > average else '↓', end='', flush=True)
+                    print('*' if l > average else '.', end='', flush=True)
 
                 scald, repro = self.model.predict(seeds)
                 self.show_progress(images, scald, repro)
