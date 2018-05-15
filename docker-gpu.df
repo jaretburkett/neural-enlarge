@@ -23,7 +23,7 @@ RUN /opt/conda/bin/python3 -m pip install opencv-python
 
 RUN apt-get update
 RUN apt-get install -y libsm6 libfontconfig1 libxrender1
-RUN apt-get install ffmpeg
+RUN apt-get install -y ffmpeg
 
 # Copy only required project files
 COPY enlarge.py .
