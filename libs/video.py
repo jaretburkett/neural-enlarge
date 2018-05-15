@@ -20,10 +20,15 @@ def enhance_video(filename, enhancer):
     # width = int(cap.get(3))
     width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
     height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+    framerate = cap.get(cv2.CAP_PROP_FPS)
     # height = int(cap.get(4))
     total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
     print('\nwidth:%i height:%i' % (width, height))
-    out_file = cv2.VideoWriter(out_filename, fourcc, 20.0, (width * args.zoom, height * args.zoom))
+    out_file = cv2.VideoWriter(
+        filename=out_filename,
+        fourcc=fourcc,
+        framerate=framerate,
+        framesize=(width * args.zoom, height * args.zoom))
 
     frame_num = 0
     while cap.isOpened():
@@ -53,4 +58,13 @@ def enhance_video(filename, enhancer):
     out_file.release()
     cv2.destroyAllWindows()
 
-    # todo copy audio
+    # todo copy audio and resize
+
+    # get video length
+    # ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 test/skate.flv
+    # 19.069352 = SS.MICROSECONDS
+
+    # set video length
+    # ffmpeg -i <videopath> -vf  "setpts=(<orig_duration>/<new_duration>)*PTS" <videopath>
+
+
