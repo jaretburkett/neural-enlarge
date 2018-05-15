@@ -154,20 +154,29 @@ def flip_vertically(img):
 
 def add_random_noise(img):
     global applied_arr
+
+    noise_scale = random.randrange(10, 30)
+    noise_scale = noise_scale / 10
     noise_sigma = random.randint(0, 60)
-    applied_arr.append('noise%i' % noise_sigma)
-    overlay = Image.new('RGBA', img.size)
+    applied_arr.append('noise%i-%1.1f' % (noise_sigma, noise_scale))
+
+    original_width, original_height = img.size
+    width = int(original_width / noise_scale)
+    height = int(original_height / noise_scale)
+    noise_size = (width, height)
+    overlay = Image.new('RGBA', noise_size)
     pix = overlay.load()
-    width, height = img.size
+    # width, height = img.size
     for x in range(0, width):
         for y in range(0, height):
                 r = random.randint(0, 255)
                 g = random.randint(0, 255)
                 b = random.randint(0, 255)
-                a = noise_sigma
+                a = random.randint(0, noise_sigma)
                 pix[x, y] = (r, g, b, a)
 
     ret_img = img.copy()
+    overlay = overlay.resize(ret_img.size, Image.NEAREST)
     ret_img.paste(overlay, (0, 0), overlay)
     return ret_img
 
