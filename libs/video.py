@@ -27,8 +27,9 @@ def enhance_video(filename, enhancer):
     out_file = cv2.VideoWriter(
         filename=out_filename,
         fourcc=fourcc,
-        framerate=framerate,
-        framesize=(width * args.zoom, height * args.zoom))
+	apiPreference=cv2.CAP_ANY,
+        fps=framerate,
+        frameSize=(width * args.zoom, height * args.zoom))
 
     frame_num = 0
     while cap.isOpened():
