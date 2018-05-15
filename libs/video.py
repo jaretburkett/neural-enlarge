@@ -12,7 +12,12 @@ if sys.platform == 'win32':
 
 
 def enhance_video(filename, enhancer):
-    out_filename = os.path.splitext(filename)[0] + '_ne%ix_%s.mp4' % (args.zoom, args.model)
+    if args.append:
+        output_filename = os.path.splitext(filename)[0] + '_%s.mp4' % args.append
+    else:
+        output_filename = os.path.splitext(filename)[0] + '_ne%ix_%s.mp4' % (args.zoom, args.model)
+
+    tmp_filename = os.path.splitext(filename)[0] + '_ne%ix_%s_tmp.mp4' % (args.zoom, args.model)
     cap = cv2.VideoCapture(filename)
 
     # Define the codec and create VideoWriter object
@@ -25,9 +30,9 @@ def enhance_video(filename, enhancer):
     total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
     print('\nwidth:%i height:%i' % (width, height))
     out_file = cv2.VideoWriter(
-        filename=out_filename,
+        filename=tmp_filename,
         fourcc=fourcc,
-	apiPreference=cv2.CAP_ANY,
+        apiPreference=cv2.CAP_ANY,
         fps=framerate,
         frameSize=(width * args.zoom, height * args.zoom))
 
@@ -35,9 +40,9 @@ def enhance_video(filename, enhancer):
     while cap.isOpened():
         percent_of = frame_num / total_frames * 100
 
-        print('\nFrame %i of %i (%3.2f%%)' % (frame_num, total_frames, percent_of), end=' ')
         ret, frame = cap.read()
         if ret:
+            print('\n%s frame %i of %i (%3.2f%%)' % (filename, frame_num, total_frames, percent_of), end=' ')
             # convert the frame to something the neural net can understand
             frame_img = scipy.misc.fromimage(magic.cv_to_pil(frame)).astype(np.float32)
             # process the frame
@@ -59,13 +64,15 @@ def enhance_video(filename, enhancer):
     out_file.release()
     cv2.destroyAllWindows()
 
-    # todo copy audio and resize
+    print('\nCompiling new frames and audio into %s' % output_filename)
+    # compile audio
+    os.system("ffmpeg -y -i %s -i %s -c:v libx264 -preset medium -crf 22 -strict -2 -map 0:v:0 -map 1:a:0 -shortest %s" %
+              (tmp_filename, filename, output_filename))
 
-    # get video length
-    # ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 test/skate.flv
-    # 19.069352 = SS.MICROSECONDS
+    # todo check for errors
 
-    # set video length
-    # ffmpeg -i <videopath> -vf  "setpts=(<orig_duration>/<new_duration>)*PTS" <videopath>
+    print('\nDone with %s' % output_filename)
 
+    # remove tmp file
+    os.remove(tmp_filename)
 
