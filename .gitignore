@@ -104,3 +104,5 @@ ENV/
 !/training_data/.gitkeep
 .DS_Store
 ._.DS_Store
+/models/*
+!/models/.gitkeep
