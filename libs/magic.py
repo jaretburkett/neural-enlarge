@@ -29,7 +29,7 @@ def add_random_motion_blur(img):
     global applied_arr
 
     cv_img = pil_to_cv(img)
-    size = random.randint(1, 10)
+    size = random.randint(1, 6)
     blur_direction = random.randint(0, 3)
 
     # add to applied string
@@ -211,16 +211,16 @@ def random_magic(img, magic_number=5):
     applied_arr = []
 
     # color
-    if random.randint(1, one_in) == 1:
-        img = adjust_random_color(img)
-
-    # contrast
-    if random.randint(1, one_in) == 1:
-        img = adjust_random_contrast(img)
-
-    # brightness
-    if random.randint(1, one_in) == 1:
-        img = adjust_random_brightness(img)
+    # if random.randint(1, one_in) == 1:
+    #     img = adjust_random_color(img)
+    #
+    # # contrast
+    # if random.randint(1, one_in) == 1:
+    #     img = adjust_random_contrast(img)
+    #
+    # # brightness
+    # if random.randint(1, one_in) == 1:
+    #     img = adjust_random_brightness(img)
 
     # sharpness
     if random.randint(1, one_in) == 1:

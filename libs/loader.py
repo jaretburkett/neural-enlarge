@@ -8,7 +8,7 @@ import threading
 import scipy.misc
 import numpy as np
 from libs.args import args
-from libs.console import error
+from libs.console import error, warn
 from PIL import Image, ImageFilter
 
 # Support ansi colors in Windows too.
@@ -26,7 +26,9 @@ class DataLoader(threading.Thread):
 
         self.orig_buffer = np.zeros((args.buffer_size, 3, self.orig_shape, self.orig_shape), dtype=np.float32)
         self.seed_buffer = np.zeros((args.buffer_size, 3, self.seed_shape, self.seed_shape), dtype=np.float32)
-        self.files = glob.glob(args.train)
+        print('finding files for %s' % args.train)
+        self.files = glob.glob(os.path.abspath('data/*.jpg'))
+        print(self.files)
         if len(self.files) == 0:
             error("There were no files found to train from searching for `{}`".format(args.train),
                   "  - Try putting all your images in one folder and using `--train=data/*.jpg`")
@@ -35,12 +37,15 @@ class DataLoader(threading.Thread):
         self.ready = set()
 
         self.cwd = os.getcwd()
+        print('starting dataloader')
         self.start()
+        # self.run()
 
     def run(self):
         while True:
             random.shuffle(self.files)
             for f in self.files:
+                # print('adding %s to buffer' % f)
                 self.add_to_buffer(f)
 
     def add_to_buffer(self, f):
@@ -104,6 +109,7 @@ class DataLoader(threading.Thread):
 
     def copy(self, origs_out, seeds_out):
         self.data_ready.wait()
+        # print('copying')
         self.data_ready.clear()
 
         for i, j in enumerate(random.sample(self.ready, args.batch_size)):

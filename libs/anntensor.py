@@ -37,9 +37,10 @@ from lasagne.layers import Conv2DLayer as ConvLayer, Deconv2DLayer as DeconvLaye
 from lasagne.layers import InputLayer, ConcatLayer, ElemwiseSumLayer, batch_norm
 
 import keras
+from keras import backend as K
 from keras.layers import Conv2D, Conv2DTranspose as DeconvLayer, MaxPool2D, MaxPooling2D
 from keras.layers import InputLayer, Concatenate, BatchNormalization, Add, Lambda, Activation
-from keras.layers import PReLU, ZeroPadding2D
+from keras.layers import PReLU, ZeroPadding2D, Input
 from keras.utils.data_utils import get_file
 from keras.applications import vgg19
 
@@ -65,12 +66,82 @@ class SubpixelReshuffleLayer(lasagne.layers.Layer):
         return out
 
 
+class Subpixel(Conv2D):
+    """Based on the code by tetrachrome: https://github.com/tetrachrome/subpixel/
+    """
+    def __init__(self,
+                 filters,
+                 kernel_size,
+                 upscale,
+                 padding='valid',
+                 data_format=None,
+                 strides=(1,1),
+                 activation=None,
+                 use_bias=True,
+                 kernel_initializer='glorot_uniform',
+                 bias_initializer='zeros',
+                 kernel_regularizer=None,
+                 bias_regularizer=None,
+                 activity_regularizer=None,
+                 kernel_constraint=None,
+                 bias_constraint=None,
+                 **kwargs):
+        super(Subpixel, self).__init__(
+            # r=upscale,
+            filters=upscale*upscale*filters,
+            kernel_size=kernel_size,
+            strides=strides,
+            padding=padding,
+            data_format=data_format,
+            activation=activation,
+            use_bias=use_bias,
+            kernel_initializer=kernel_initializer,
+            bias_initializer=bias_initializer,
+            kernel_regularizer=kernel_regularizer,
+            bias_regularizer=bias_regularizer,
+            activity_regularizer=activity_regularizer,
+            kernel_constraint=kernel_constraint,
+            bias_constraint=bias_constraint,
+            **kwargs)
+        self.r = upscale
+
+    def _phase_shift(self, I):
+        r = self.r
+        bsize, a, b, c = I.get_shape().as_list()
+        bsize = K.shape(I)[0] # Handling Dimension(None) type for undefined batch dim
+        X = K.reshape(I, [bsize, a, b, c/(r*r),r, r]) # bsize, a, b, c/(r*r), r, r
+        X = K.permute_dimensions(X, (0, 1, 2, 5, 4, 3))  # bsize, a, b, r, r, c/(r*r)
+        #Keras backend does not support tf.split, so in future versions this could be nicer
+        X = [X[:,i,:,:,:,:] for i in range(a)] # a, [bsize, b, r, r, c/(r*r)
+        X = K.concatenate(X, 2)  # bsize, b, a*r, r, c/(r*r)
+        X = [X[:,i,:,:,:] for i in range(b)] # b, [bsize, r, r, c/(r*r)
+        X = K.concatenate(X, 2)  # bsize, a*r, b*r, c/(r*r)
+        return X
+
+    def call(self, inputs):
+        return self._phase_shift(super(Subpixel, self).call(inputs))
+
+    def compute_output_shape(self, input_shape):
+        unshifted = super(Subpixel, self).compute_output_shape(input_shape)
+        return (unshifted[0], self.r*unshifted[1], self.r*unshifted[2], unshifted[3]/(self.r*self.r))
+
+    def get_config(self):
+        config = super(Conv2D, self).get_config()
+        config.pop('rank')
+        config.pop('dilation_rate')
+        config['filters']/=self.r*self.r
+        config['r'] = self.r
+        return config
+
+
 class Model(object):
 
     def __init__(self):
         self.network = collections.OrderedDict()
         self.network['img'] = InputLayer((None, 3, None, None))
         self.network['seed'] = InputLayer((None, 3, None, None))
+
+        # import model
         self.model = None
 
         config, params = self.load_model()
@@ -131,45 +202,15 @@ class Model(object):
         for i in range(0, args.generator_upscale):
             u = next(units_iter)
             self.make_layer('upscale%i.2' % i, self.last_layer(), u * 4)
-            self.network['upscale%i.1' % i] = SubpixelReshuffleLayer(self.last_layer(), u, 2)
+            # self.network['upscale%i.1' % i] = SubpixelReshuffleLayer(self.last_layer(), u, 2)
+            # todo not sure which kernel size to use
+            self.network['upscale%i.1' % i] = Subpixel(filters=u, upscale=2, kernel_size=(3, 3))(self.last_layer())
 
-        self.network['out'] = ConvLayer(self.last_layer(), 3, filter_size=(7, 7), pad=(3, 3), nonlinearity=None)
+        # self.network['out'] = ConvLayer(self.last_layer(), 3, filter_size=(7, 7), pad=(3, 3), nonlinearity=None)
+        padding = ZeroPadding2D(padding=(3, 3), name='out_')(self.last_layer())
+        self.network['out'] = Conv2D(filters=3, kernel_size=(7, 7))(padding)
 
     def setup_perceptual(self, input):
-        # vgg19.VGG19()
-        # offset = np.array([103.939, 116.779, 123.680], dtype=np.float32).reshape((1, 3, 1, 1))
-        # self.network['percept'] = lasagne.layers.NonlinearityLayer(input, lambda x: ((x + 0.5) * 255.0) - offset)
-        #
-        # self.network['mse'] = self.network['percept']
-        # self.network['conv1_1'] = ConvLayer(self.network['percept'], 64, 3, pad=1)
-        # self.network['conv1_2'] = ConvLayer(self.network['conv1_1'], 64, 3, pad=1)
-        # self.network['pool1'] = PoolLayer(self.network['conv1_2'], 2, mode='max')
-
-        # Block 2
-        # self.network['conv2_1'] = ConvLayer(self.network['pool1'], 128, 3, pad=1)
-        # self.network['conv2_2'] = ConvLayer(self.network['conv2_1'], 128, 3, pad=1)
-        # self.network['pool2'] = PoolLayer(self.network['conv2_2'], 2, mode='max')
-
-        # Block 3
-        # self.network['conv3_1'] = ConvLayer(self.network['pool2'], 256, 3, pad=1)
-        # self.network['conv3_2'] = ConvLayer(self.network['conv3_1'], 256, 3, pad=1)
-        # self.network['conv3_3'] = ConvLayer(self.network['conv3_2'], 256, 3, pad=1)
-        # self.network['conv3_4'] = ConvLayer(self.network['conv3_3'], 256, 3, pad=1)
-        # self.network['pool3'] = PoolLayer(self.network['conv3_4'], 2, mode='max')
-        #
-        # # Block 4
-        # self.network['conv4_1'] = ConvLayer(self.network['pool3'], 512, 3, pad=1)
-        # self.network['conv4_2'] = ConvLayer(self.network['conv4_1'], 512, 3, pad=1)
-        # self.network['conv4_3'] = ConvLayer(self.network['conv4_2'], 512, 3, pad=1)
-        # self.network['conv4_4'] = ConvLayer(self.network['conv4_3'], 512, 3, pad=1)
-        # self.network['pool4'] = PoolLayer(self.network['conv4_4'], 2, mode='max')
-        #
-        # # Block 5
-        # self.network['conv5_1'] = ConvLayer(self.network['pool4'], 512, 3, pad=1)
-        # self.network['conv5_2'] = ConvLayer(self.network['conv5_1'], 512, 3, pad=1)
-        # self.network['conv5_3'] = ConvLayer(self.network['conv5_2'], 512, 3, pad=1)
-        # self.network['conv5_4'] = ConvLayer(self.network['conv5_3'], 512, 3, pad=1)
-
         # keras
         # todo not sure if this percept part is right
         offset = np.array([103.939, 116.779, 123.680], dtype=np.float32).reshape((1, 3, 1, 1))
@@ -210,21 +251,6 @@ class Model(object):
         # self.network['pool5'] = MaxPooling2D((2, 2), strides=(2, 2), name='block5_pool')(self.network['conv5_4'])
 
     def setup_discriminator(self):
-        # c = args.discriminator_size
-        # self.make_layer('disc1.1', batch_norm(self.network['conv1_2']), 1 * c, filter_size=(5, 5), stride=(2, 2),
-        #                 pad=(2, 2))
-        # self.make_layer('disc1.2', self.last_layer(), 1 * c, filter_size=(5, 5), stride=(2, 2), pad=(2, 2))
-        # self.make_layer('disc2', batch_norm(self.network['conv2_2']), 2 * c, filter_size=(5, 5), stride=(2, 2),
-        #                 pad=(2, 2))
-        # self.make_layer('disc3', batch_norm(self.network['conv3_2']), 3 * c, filter_size=(3, 3), stride=(1, 1),
-        #                 pad=(1, 1))
-        # hypercolumn = ConcatLayer([self.network['disc1.2>'], self.network['disc2>'], self.network['disc3>']])
-        # self.make_layer('disc4', hypercolumn, 4 * c, filter_size=(1, 1), stride=(1, 1), pad=(0, 0))
-        # self.make_layer('disc5', self.last_layer(), 3 * c, filter_size=(3, 3), stride=(2, 2))
-        # self.make_layer('disc6', self.last_layer(), 2 * c, filter_size=(1, 1), stride=(1, 1), pad=(0, 0))
-        self.network['disc'] = batch_norm(ConvLayer(self.last_layer(), 1, filter_size=(1, 1),
-                                                    nonlinearity=lasagne.nonlinearities.linear))
-
         #keras
         c = args.discriminator_size
         self.make_layer('disc1.1', BatchNormalization()(self.network['conv1_2']), 1 * c, filter_size=(5, 5), stride=(2, 2),
@@ -270,7 +296,7 @@ class Model(object):
             yield (name, l)
 
     def get_filename(self, absolute=False):
-        filename = 'models/ne%ix-%s-%s-%s.pkl.bz2' % (args.zoom, args.type, args.model, __version__)
+        filename = 'models/ne%ix-%s-%s-%s.h5' % (args.zoom, args.type, args.model, __version__)
         return os.path.abspath(os.path.join(os.path.dirname(__file__), '..', filename)) if absolute else filename
 
     def save_generator(self):
@@ -283,15 +309,27 @@ class Model(object):
         pickle.dump((config, params), bz2.open(self.get_filename(absolute=True), 'wb'))
         print('  - Saved model as `{}` after training.'.format(self.get_filename()))
 
-    def load_model(self):
+    def load_keras_model(self):
         if not os.path.exists(self.get_filename(absolute=True)):
             if args.train:
-                return {}, {}
-            error("Model file with pre-trained convolution layers not found. Download it here...",
+                return None
+            else:
+                error("Model file with pre-trained convolution layers not found. Download it here...",
                   "https://github.com/jaretburkett/neural-enlarge/releases/download/v%s/%s" % (
-                  __version__, self.get_filename()))
-        print('  - Loaded file `{}` with trained model.'.format(self.get_filename()))
-        return pickle.load(bz2.open(self.get_filename(absolute=True), 'rb'))
+                      __version__, self.get_filename()))
+        else:
+            return keras.models.load_model(self.get_filename(absolute=True))
+
+
+    # def load_model(self):
+    #     if not os.path.exists(self.get_filename(absolute=True)):
+    #         if args.train:
+    #             return {}, {}
+    #         error("Model file with pre-trained convolution layers not found. Download it here...",
+    #               "https://github.com/jaretburkett/neural-enlarge/releases/download/v%s/%s" % (
+    #               __version__, self.get_filename()))
+    #     print('  - Loaded file `{}` with trained model.'.format(self.get_filename()))
+    #     return pickle.load(bz2.open(self.get_filename(absolute=True), 'rb'))
 
     def load_generator(self, params):
         if len(params) == 0:
@@ -322,9 +360,11 @@ class Model(object):
 
     def compile(self):
         # Helper function for rendering test images during training, or standalone inference mode.
-        input_tensor, seed_tensor = T.tensor4(), T.tensor4()
+        # input_tensor, seed_tensor = T.tensor4(), T.tensor4()
+        input_tensor, seed_tensor = InputLayer((None, 3, None, None)), InputLayer((None, 3, None, None))
         input_layers = {self.network['img']: input_tensor, self.network['seed']: seed_tensor}
         output = lasagne.layers.get_output([self.network[k] for k in ['seed', 'out']], input_layers, deterministic=True)
+        # self.predict = theano.function([seed_tensor], output)
         self.predict = theano.function([seed_tensor], output)
 
         if not args.train: return

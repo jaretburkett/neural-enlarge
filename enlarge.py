@@ -3,7 +3,7 @@
  _   _                      _   _____      _
 | \ | |                    | | |  ___|    | |
 |  \| | ___ _   _ _ __ __ _| | | |__ _ __ | | __ _ _ __ __ _  ___
-| . ` |/ _ \ | | | '__/ _` | | |  __| '_ \| |/ _` | '__/ _` |/ _ \
+| . ` |/ _ \ | | | '__/ _` | | |  __| '_ \| |/ _` | '__/ _` |/ _ |
 | |\  |  __/ |_| | | | (_| | | | |__| | | | | (_| | | | (_| |  __/
 \_| \_/\___|\__,_|_|  \__,_|_| \____/_| |_|_|\__,_|_|  \__, |\___|
                                                         __/ |
@@ -36,7 +36,8 @@ import scipy.ndimage
 from libs.args import args
 from libs.console import ansi
 from libs.video import enhance_video
-from libs.enhance import NeuralEnhancer
+# from libs.enhance import NeuralEnhancer
+from libs.newenhance import NeuralEnhancer
 
 # Support ansi colors in Windows too.
 if sys.platform == 'win32':
@@ -51,10 +52,12 @@ print("""{}   {}Super Resolution for images and videos powered by Deep Learning!
 
 if __name__ == "__main__":
     if args.train:
+        print('train')
         args.zoom = 2 ** (args.generator_upscale - args.generator_downscale)
         enhancer = NeuralEnhancer(loader=True)
         enhancer.train()
     else:
+        print('enlarge')
         enhancer = NeuralEnhancer(loader=False)
         for filename in args.files:
             print(filename, end=' ')
