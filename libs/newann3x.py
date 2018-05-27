@@ -1,3 +1,4 @@
+#%%
 from keras import backend as K
 import os
 from libs.version import __version__
@@ -44,21 +45,26 @@ class Model(object):
         self.model = None
         self.channels = 3
 
-        self.n1 = 50
-        self.n2 = 100
-        self.n3 = 200
+        self.n1 = 32
+        self.n2 = 64
+        self.n3 = 128
 
         self.load_model()
 
     def make_model(self):
-        img_size = args.batch_shape / 2
+        # img_size = args.batch_shape / 3
+        img_size = 384 / 3
         init = Input((img_size, img_size, 3), name='input_1')
         c1 = Conv2D(self.n1, (3, 3), activation='relu', padding='same')(init)
         c1 = Conv2D(self.n1, (3, 3), activation='relu', padding='same')(c1)
 
-        # 2x output
-        c1_up = Conv2DTranspose(self.n3, (3, 3), activation='relu', padding='same', strides=(2, 2))(c1)
+        # upsample the output feeding m2
+        # c1_up = UpSampling2D()(c1)
+        c1_up_2x = Conv2DTranspose(self.n2, (3, 3), activation='relu', padding='same', strides=(2, 2))(c1)
+        c1_up_3x = Conv2DTranspose(self.n3, (3, 3), activation='relu', padding='same', strides=(3, 3))(c1)
 
+        # don't pool so we can upscale
+        # x = MaxPooling2D((2, 2))(c1)
         x = c1
 
         c2 = Conv2D(self.n2, (3, 3), activation='relu', padding='same')(x)
@@ -66,31 +72,43 @@ class Model(object):
 
         x = MaxPooling2D((2, 2))(c2)
 
-        # c3 = Conv2D(self.n3, (3, 3), activation='relu', padding='same')(x)
+        c3 = Conv2D(self.n2, (3, 3), activation='relu', padding='same')(x)
 
         # x = UpSampling2D()(c3)
-        c2_2 = Conv2DTranspose(self.n3, (3, 3), activation='relu', padding='same', strides=(2, 2))(x)
+        x = Conv2DTranspose(self.n3, (3, 3), activation='relu', padding='same', strides=(2, 2))(c3)
 
-        # c2_2 = Conv2D(self.n2, (3, 3), activation='relu', padding='same')(x)
+        c2_2 = Conv2D(self.n2, (3, 3), activation='relu', padding='same')(x)
         c2_2 = Conv2D(self.n2, (3, 3), activation='relu', padding='same')(c2_2)
 
         m1 = Add()([c2, c2_2])
-        m1 = Conv2DTranspose(self.n1, (3, 3), activation='relu', padding='same', strides=(2, 2))(m1)
+        m1_2x = Conv2DTranspose(self.n2, (3, 3), activation='relu', padding='same', strides=(2, 2))(m1)
+        m1_3x = Conv2DTranspose(self.n2, (3, 3), activation='relu', padding='same', strides=(3, 3))(m1)
         # m1 = UpSampling2D()(m1)
 
-        c1_2 = Conv2D(self.n2, (3, 3), activation='relu', padding='same')(m1)
-        c1_2 = Conv2D(self.n3, (3, 3), activation='relu', padding='same')(c1_2)
+        c1_2_1x = Conv2D(self.n1, (3, 3), activation='relu', padding='same')(m1)
+        # c1_2_1x = Conv2D(self.n1, (3, 3), activation='relu', padding='same')(c1_2_1x)
 
-        m2 = Add()([c1_up, c1_2])
+        c1_2_2x = Conv2D(self.n2, (3, 3), activation='relu', padding='same')(m1_2x)
+        # c1_2_2x = Conv2D(self.n2, (3, 3), activation='relu', padding='same')(c1_2_2x)
 
-        decoded = Conv2D(self.channels, (5, 5), activation='linear', padding='same')(m2)
+        c1_2_3x = Conv2D(self.n3, (3, 3), activation='relu', padding='same')(m1_3x)
+        # c1_2_3x = Conv2D(self.n3, (3, 3), activation='relu', padding='same')(c1_2_3x)
 
-        model = KerasModel(init, decoded)
+        m2_1x = Add()([c1, c1_2_1x])
+        m2_2x = Add()([c1_up_2x, c1_2_2x])
+        m2_3x = Add()([c1_up_3x, c1_2_3x])
+
+        decoded1x = Conv2D(self.channels, (5, 5), activation='linear', padding='same', name='decode_1')(m2_1x)
+        decoded2x = Conv2D(self.channels, (5, 5), activation='linear', padding='same', name='decode_2')(m2_2x)
+        decoded3x = Conv2D(self.channels, (5, 5), activation='linear', padding='same', name='decode_3')(m2_3x)
+
+        model = KerasModel(init, outputs=[decoded1x, decoded2x, decoded3x])
+
         adam = optimizers.Adam(lr=1e-3)
-        model.compile(optimizer=adam, loss='mse', metrics=[PSNRLoss])
+        model.compile(optimizer=adam, loss='mse', metrics=[PSNRLoss], loss_weights=[0.33, 0.33, 0.33])
 
-        model.summary()
-
+        model.summary(line_length=150)
+        model.load_weights()
         # load weights
         if os.path.exists(self.get_filename(absolute=True)):
             model.load_weights(self.get_filename(absolute=True), by_name=True)
@@ -98,15 +116,17 @@ class Model(object):
 
         # return model
 
-    def fit(self, images, seeds):
-        # print('fitting')
-        # self.history = self.model.fit(seeds, images, verbose=0, epochs=1, validation_split=.2)
+    def fit(self, origs1x_train, origs2x_train, origs3x_train, seeds):
+        # images_shape = images.shape
+        # print(images_shape)
+        self.history = self.model.fit(seeds, y=[origs1x_train, origs2x_train, origs3x_train], verbose=0, epochs=1, validation_split=.2)
         # print('seeds', seeds.shape)
         # print('images', images.shape)
-        self.history = self.model.train_on_batch(seeds, images)
-        # return self.history.history
+
+        # self.history = self.model.train_on_batch(seeds, [origs1x_train, origs2x_train, origs3x_train])
+        return self.history.history
         # print(self.history)
-        return self.history
+        # return self.history
 
     def get_filename(self, absolute=False):
         filename = 'models/ne%ix-%s-%s-%s.h5' % (args.zoom, args.type, args.model, __version__)
@@ -132,31 +152,19 @@ class Model(object):
 
     def predict(self, img_arr):
         scald = []
-        repro = []
+        repro1x = []
+        repro2x = []
+        repro3x = []
+        # i = 0
         for x in img_arr:
             scald.append(x)
-            # training_seeds = np.transpose(x, (2, 1, 0))  # This is correct, not sure why it is flipped
-            training_seeds = np.transpose(x, (1, 2, 0))
+            training_seeds = np.transpose(x, (2, 1, 0))
             processed = self.model.predict(nd.array([training_seeds]))
-            repro.append(np.transpose(processed[0], (2, 0, 1)))
+            repro1x.append(processed[0])
+            repro2x.append(processed[1])
+            repro3x.append(processed[2])
 
-        return scald, repro
-
-    def output_per_layer(self, img_arr):
-
-        each_layer = []
-        layer_names = [layer.name for layer in self.model.layers]
-
-        inp = self.model.input  # input placeholder
-        outputs = [layer.output for layer in self.model.layers]  # all layer outputs
-        functor = K.function([inp] + [K.learning_phase()], outputs)  # evaluation function
-
-        # test_img = np.transpose(img_arr[0], (2, 1, 0))  # This is correct, not sure why it is flipped
-        test_img = np.transpose(img_arr[0], (1, 2, 0))
-        test = nd.array([test_img])
-        layer_outs = functor([test, 1.])
-        each_layer = layer_outs
-        return layer_names, each_layer
+        return scald, repro1x, repro2x, repro3x
 
 
 

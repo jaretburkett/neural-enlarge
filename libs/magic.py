@@ -25,11 +25,11 @@ def convert_to_uint8(image_in):
     return temp_image.astype(np.uint8)
 
 
-def add_random_motion_blur(img):
+def add_random_motion_blur(img, magic=10):
     global applied_arr
-
+    max_size = round(0.5 * magic + 1)
     cv_img = pil_to_cv(img)
-    size = random.randint(1, 6)
+    size = random.randint(1, max_size)
     blur_direction = random.randint(0, 3)
 
     # add to applied string
@@ -69,7 +69,7 @@ def add_random_motion_blur(img):
     return cv_to_pil(cv_img)
 
 
-def add_random_blur(img):
+def add_random_blur(img, magic=10):
     global applied_arr
     size = random.randint(0, 2)
 
@@ -115,9 +115,10 @@ def adjust_random_brightness(img):
     return enhance_image.enhance(adjust)
 
 
-def adjust_random_sharpness(img):
+def adjust_random_sharpness(img, magic=10):
+    max_adjust = round(0.5 * magic + 1)
     global applied_arr
-    adjust = random.randrange(1, 6)
+    adjust = random.randrange(1, max_adjust)
 
     # add to applied string
     applied_arr.append('sharp%1.1f' % adjust)
@@ -126,9 +127,10 @@ def adjust_random_sharpness(img):
     return enhance_image.enhance(adjust)
 
 
-def random_jpg_compression(img):
+def random_jpg_compression(img, magic=10):
     global applied_arr
-    quality = random.randint(20, 90)
+    base = round(70 / magic + 20)
+    quality = random.randint(base, 90)
 
     # add to applied string
     applied_arr.append('jpg%i' % quality)
@@ -152,12 +154,13 @@ def flip_vertically(img):
     return img.transpose(Image.FLIP_TOP_BOTTOM)
 
 
-def add_random_noise(img):
+def add_random_noise(img, magic=10):
     global applied_arr
 
+    max_sigma = magic * 6
     noise_scale = random.randrange(10, 30)
     noise_scale = noise_scale / 10
-    noise_sigma = random.randint(0, 60)
+    noise_sigma = random.randint(0, max_sigma)
     applied_arr.append('noise%i-%1.1f' % (noise_sigma, noise_scale))
 
     original_width, original_height = img.size
@@ -204,42 +207,43 @@ def random_flip(img):
 
 
 def random_magic(img, magic_number=5):
-    global applied_arr
-    # how often to apply filters, magic number 0-10
-    one_in = 11 - magic_number
-    # reset applied arr
-    applied_arr = []
+    if magic_number is not 0:
+        global applied_arr
+        # how often to apply filters, magic number 0-10
+        one_in = 20 - magic_number
+        # reset applied arr
+        applied_arr = []
 
-    # color
-    # if random.randint(1, one_in) == 1:
-    #     img = adjust_random_color(img)
-    #
-    # # contrast
-    # if random.randint(1, one_in) == 1:
-    #     img = adjust_random_contrast(img)
-    #
-    # # brightness
-    # if random.randint(1, one_in) == 1:
-    #     img = adjust_random_brightness(img)
+        # color
+        # if random.randint(1, one_in) == 1:
+        #     img = adjust_random_color(img)
+        #
+        # # contrast
+        # if random.randint(1, one_in) == 1:
+        #     img = adjust_random_contrast(img)
+        #
+        # # brightness
+        # if random.randint(1, one_in) == 1:
+        #     img = adjust_random_brightness(img)
 
-    # sharpness
-    if random.randint(1, one_in) == 1:
-        img = adjust_random_sharpness(img)
+        # sharpness
+        if random.randint(1, one_in) == 1:
+            img = adjust_random_sharpness(img, magic_number)
 
-    # blur
-    if random.randint(1, one_in) == 1:
-        img = add_random_blur(img)
+        # blur
+        if random.randint(1, one_in) == 1:
+            img = add_random_blur(img, magic_number)
 
-    # motion blur
-    if random.randint(1, one_in) == 1:
-        img = add_random_motion_blur(img)
+        # motion blur
+        if random.randint(1, one_in) == 1:
+            img = add_random_motion_blur(img, magic_number)
 
-    # noise
-    if random.randint(1, one_in) == 1:
-        img = add_random_noise(img)
+        # noise
+        if random.randint(1, one_in) == 1:
+            img = add_random_noise(img, magic_number)
 
-    # jpg compression, always add
-    img = random_jpg_compression(img)
+        # jpg compression, always add
+        img = random_jpg_compression(img, magic_number)
 
     return img
 
