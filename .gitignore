@@ -106,3 +106,4 @@ ENV/
 ._.DS_Store
 /models/*
 !/models/.gitkeep
+/test2.py

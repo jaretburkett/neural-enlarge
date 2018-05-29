@@ -172,7 +172,7 @@ class Model(object):
         padding = ZeroPadding2D(padding=pad, name=name + '_')(input)
         conv = Conv2D(filters=units, kernel_size=filter_size, strides=stride, padding='valid', name=name + 'x')(padding)
         prelu = PReLU(alpha_initializer=keras.initializers.Constant(alpha), name=name + '>')(conv)
-        self.network[name + '_'] = padding
+        # self.network[name + '_'] = padding
         self.network[name + 'x'] = conv
         self.network[name + '>'] = prelu
         return prelu

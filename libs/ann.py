@@ -32,7 +32,7 @@ from lasagne.layers import InputLayer, ConcatLayer, ElemwiseSumLayer, batch_norm
 class SubpixelReshuffleLayer(lasagne.layers.Layer):
     """Based on the code by ajbrock: https://github.com/ajbrock/Neural-Photo-Editor/
     """
-
+    # self.network['upscale%i.1' % i] = SubpixelReshuffleLayer(self.last_layer(), u, 2)
     def __init__(self, incoming, channels, upscale, **kwargs):
         super(SubpixelReshuffleLayer, self).__init__(incoming, **kwargs)
         self.upscale = upscale

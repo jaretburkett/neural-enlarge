@@ -22,7 +22,7 @@ add_arg('--train-jpeg', default=[40, 30], nargs='+', type=int, help='JPEG compre
 add_arg('--epochs', default=10, type=int, help='Total number of iterations in training.')
 add_arg('--epoch-size', default=72, type=int, help='Number of batches trained in an epoch.')
 add_arg('--save-every', default=10, type=int, help='Save generator after every training epoch.')
-add_arg('--batch-shape', default=256, type=int, help='Resolution of images in training batch.')
+add_arg('--batch-shape', default=255, type=int, help='Resolution of images in training batch.')
 add_arg('--batch-size', default=10, type=int, help='Number of images per training batch.')
 add_arg('--buffer-size', default=1000, type=int, help='Total image fragments kept in cache.')
 add_arg('--buffer-fraction', default=5, type=int, help='Fragments cached for each image loaded.')
@@ -44,3 +44,6 @@ add_arg('--discriminator-start', default=1, type=int, help='Epoch count to updat
 add_arg('--adversarial-start', default=2, type=int, help='Epoch for generator to use discriminator.')
 add_arg('--device', default='cpu', type=str, help='Name of the CPU/GPU to use, for Theano.')
 args = parser.parse_args()
+
+if args.train:
+    args.zoom = 2 ** (args.generator_upscale - args.generator_downscale)

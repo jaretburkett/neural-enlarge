@@ -52,12 +52,10 @@ print("""{}   {}Super Resolution for images and videos powered by Deep Learning!
 
 if __name__ == "__main__":
     if args.train:
-        print('train')
         # args.zoom = 2 ** (args.generator_upscale - args.generator_downscale)
         enhancer = NeuralEnhancer(loader=True)
         enhancer.train()
     else:
-        print('enlarge')
         enhancer = NeuralEnhancer(loader=False)
         for filename in args.files:
             print(filename, end=' ')

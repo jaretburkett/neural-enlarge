@@ -12,6 +12,10 @@ from libs.args import args
 from libs.console import error, warn
 from PIL import Image, ImageFilter
 
+deblur = False
+if "deblur" in args.model:
+    deblur = True
+
 # Support ansi colors in Windows too.
 if sys.platform == 'win32':
     pass
@@ -23,6 +27,9 @@ class DataLoader(threading.Thread):
         self.data_ready = threading.Event()
         self.data_copied = threading.Event()
         self.magic = 0.0
+
+        if deblur:
+            self.magic = 5.0
 
         self.orig_shape, self.seed_shape = args.batch_shape, args.batch_shape // args.zoom
 
@@ -51,10 +58,12 @@ class DataLoader(threading.Thread):
         self.magic = m * 0.1
 
     def less_magic(self):
-        min_magic = 1
+        min_magic = 0
+        if deblur:
+            min_magic = 30
         # if self.magic > min_magic:
         #     self.magic = self.magic - 0.1
-        m = random.randint(10, 50)
+        m = random.randint(min_magic, 50)
         self.magic = m * 0.1
 
 

@@ -3,7 +3,10 @@ import cv2
 import PIL
 import random
 import numpy as np
+from libs.args import args
 from PIL import ImageEnhance, ImageFilter, Image
+
+deblur = True if "deblur" in args.model else False
 
 applied_arr = []
 
@@ -214,17 +217,20 @@ def random_magic(img, magic_number=5):
         # reset applied arr
         applied_arr = []
 
-        # color
-        # if random.randint(1, one_in) == 1:
-        #     img = adjust_random_color(img)
-        #
-        # # contrast
-        # if random.randint(1, one_in) == 1:
-        #     img = adjust_random_contrast(img)
-        #
-        # # brightness
-        # if random.randint(1, one_in) == 1:
-        #     img = adjust_random_brightness(img)
+        if deblur:
+            one_in = 11 - magic_number
+
+            # color
+            if random.randint(1, one_in) == 1:
+                img = adjust_random_color(img)
+
+            # # contrast
+            if random.randint(1, one_in) == 1:
+                img = adjust_random_contrast(img)
+
+            # # brightness
+            if random.randint(1, one_in) == 1:
+                img = adjust_random_brightness(img)
 
         # sharpness
         if random.randint(1, one_in) == 1:

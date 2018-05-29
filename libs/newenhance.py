@@ -9,9 +9,23 @@ import scipy.interpolate
 
 from libs.args import args
 # from libs.ann import Model
-from libs.newann import Model
+# from libs.newann import Model, VGG19Model
+from libs import newann as models
 from libs.loader import DataLoader
 from libs.console import ansi, error
+
+deblur = False
+
+if "vgg19b34" in args.model:
+    Model = models.VGG19b34
+elif "vgg19b13" in args.model:
+    Model = models.VGG19b13
+elif "deblur" in args.model:
+    Model = models.DEBLUR
+    deblur = True
+else:
+    from libs.lasagnemodel import LasagneModel
+    Model = LasagneModel
 
 # Support ansi colors in Windows too.
 if sys.platform == 'win32':
@@ -30,6 +44,7 @@ class NeuralEnhancer(object):
 
         self.thread = DataLoader() if loader else None
         self.model = Model()
+        # self.model = Model()
 
         print('{}'.format(ansi.ENDC))
 
@@ -85,8 +100,8 @@ class NeuralEnhancer(object):
         # print(seeds.shape)
         # try:
         learning_rate_decay_multiplier = .01
-        max_learning_rate = 0.001
-        min_learning_rate = 0.000000001
+        max_learning_rate = 0.01
+        min_learning_rate = 0.0000001
         l_r = 0.0001
 
         previous_loss = None
@@ -123,7 +138,7 @@ class NeuralEnhancer(object):
             this_loss = sum(total)
             if not previous_loss:
                 previous_loss = this_loss
-            else:
+            elif deblur or (epoch > 50):
                 if this_loss > previous_loss:
                     # increase learning rate
                     l_r += l_r * learning_rate_decay_multiplier
@@ -182,15 +197,42 @@ class NeuralEnhancer(object):
 
         # Prepare paded input image as well as output buffer of zoomed size.
         s, p, z = args.rendering_tile, args.rendering_overlap, args.zoom
+        # default = s=80, p=24, z=2
         image = np.pad(original, ((p, p), (p, p), (0, 0)), mode='reflect')
         output = np.zeros((original.shape[0] * z, original.shape[1] * z, 3), dtype=np.float32)
+
+        wh = args.rendering_tile + (args.rendering_overlap * 2)
+
+
 
         # Iterate through the tile coordinates and pass them through the network.
         for y, x in itertools.product(range(0, original.shape[0], s), range(0, original.shape[1], s)):
             img = np.transpose(image[y:y + p * 2 + s, x:x + p * 2 + s, :] / 255.0 - 0.5, (2, 0, 1))[np.newaxis].astype(
                 np.float32)
-            repro = self.model.predict(img)
-            output[y * z:(y + s) * z, x * z:(x + s) * z, :] = np.transpose(repro[0] + 0.5, (1, 2, 0))[p * z:-p * z,
+            print('Processing image part before pad', img.shape)
+
+            # add pad to the stitch to make it match input of model
+            b, c, w, h = img.shape
+            wp = wh - w
+            hp = wh - h
+            # prepare output depad
+            unpad = np.zeros((w, h, c))
+            img = np.pad(img, ((0, 0), (0, 0), (0, wp), (0, hp)), mode='reflect')
+
+            print('Padded', img.shape)
+            unused, repro = self.model.predict(img)
+            print('output', repro[0].shape)
+            # remove any padding
+            if (wp > 0) and (hp > 0):
+                unpad = repro[0][:, 0: -hp * z, 0: -wp * z]
+            elif hp > 0:
+                unpad = repro[0][:, 0: -hp * z, :]
+            elif wp > 0:
+                unpad = repro[0][:, :,  0: -wp * z]
+            else:
+                unpad = repro[0]
+            print('unpad output', unpad.shape)
+            output[y * z:(y + s) * z, x * z:(x + s) * z, :] = np.transpose(unpad + 0.5, (1, 2, 0))[p * z:-p * z,
                                                               p * z:-p * z, :]
             print('.', end='', flush=True)
         output = output.clip(0.0, 1.0) * 255.0
