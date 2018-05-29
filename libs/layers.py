@@ -1,46 +1,75 @@
-from keras import backend as K
-from keras.engine.topology import Layer
+from keras.layers import Layer
+import keras.backend as K
 import itertools
-import numpy as np
+import tensorflow as tf
 
 
-class SubpixelReshuffleLayer(Layer):
-    """Based on the code by ajbrock: https://github.com/ajbrock/Neural-Photo-Editor/
-    """
+class SubPixelUpscaling(Layer):
 
-    def __init__(self, incoming, channels, upscale, **kwargs):
-        super(SubpixelReshuffleLayer, self).__init__(incoming, **kwargs)
-        self.upscale = upscale
+    def __init__(self, r, channels, **kwargs):
+        super(SubPixelUpscaling, self).__init__(**kwargs)
+
+        self.r = r
         self.channels = channels
 
-    def get_output_shape_for(self, input_shape):
-        def up(d): return self.upscale * d if d else d
+    def build(self, input_shape):
+        pass
 
-        return input_shape[0], self.channels, up(input_shape[2]), up(input_shape[3])
-
-    def get_output_for(self, input, deterministic=False, **kwargs):
-        out, r = K.zeros(self.get_output_shape_for(input.shape)), self.upscale
-        for y, x in itertools.product(range(r), repeat=2):
-            out = T.inc_subtensor(out[:, :, y::r, x::r], input[:, r * y + x::r * r, :, :])
+    def _phase_shift_th(self, input, scale, channels):
+        import theano.tensor as T
+        b, k, row, col = input.shape
+        output_shape = (b, channels, row * scale, col * scale)
+        out = T.zeros(output_shape)
+        r = scale
+        for y, x in itertools.product(range(scale), repeat=2):
+            out = T.inc_subtensor(out[:, :, y::r, x::r], input[:, r * y + x:: r * r, :, :])
         return out
 
+    def _phase_shift(self, I, r, batch_size):
+        # Helper function with main phase shift operation
+        bsize, a, b, c = I.get_shape().as_list()
+        X = tf.reshape(I, (batch_size, a, b, r, r))
+        X = tf.split(X, a, 1)  # a, [bsize, b, r, r]
+        X = tf.concat([tf.squeeze(x) for x in X], 2)  # bsize, b, a*r, r
+        X = tf.split(X, b, 1)  # b, [bsize, a*r, r]
+        X = tf.concat([tf.squeeze(x) for x in X], 2)  # bsize, a*r, b*r
+        return tf.reshape(X, (batch_size, a * r, b * r, 1))
 
-class MyLayer(Layer):
+    # NOTE:test without batchsize
+    def _phase_shift_test(self, I, r):
+        bsize, a, b, c = I.get_shape().as_list()
+        X = tf.reshape(I, (1, a, b, r, r))
+        X = tf.split(X, a, 1)  # a, [bsize, b, r, r]
+        X = tf.concat([tf.squeeze(x) for x in X], 1)  # bsize, b, a*r, r
+        X = tf.split(X, b, 0)  # b, [bsize, a*r, r]
+        X = tf.concat([tf.squeeze(x) for x in X], 1)  # bsize, a*r, b*r
+        return tf.reshape(X, (1, a * r, b * r, 1))
 
-    def __init__(self, output_dim, **kwargs):
-        self.output_dim = output_dim
-        super(MyLayer, self).__init__(**kwargs)
+    def call(self, x, mask=None):
+        if K.backend() == "theano":
+            # y = depth_to_scale_th(x, self.r, self.channels)
+            y = self._phase_shift_th(x, self.r, self.channels)
+        else:
+            batch_size = K.int_shape(x)[0]
+            # return self.PS(x, self.r, batch_size)
 
-    def build(self, input_shape):
-        # Create a trainable weight variable for this layer.
-        self.kernel = self.add_weight(name='kernel',
-                                      shape=(input_shape[1], self.output_dim),
-                                      initializer='uniform',
-                                      trainable=True)
-        super(MyLayer, self).build(input_shape)  # Be sure to call this at the end
-
-    def call(self, x):
-        return K.dot(x, self.kernel)
+            Xc = tf.split(x, self.channels, 3)
+            if batch_size:
+                X = tf.concat([self._phase_shift(x, self.r, batch_size) for x in Xc], 3)  # Do the concat RGB
+            else:
+                X = tf.concat([self._phase_shift_test(x, self.r) for x in Xc], 3)  # Do the concat RGB
+            return X
+        return y
 
     def compute_output_shape(self, input_shape):
-        return (input_shape[0], self.output_dim)
+        if K.image_dim_ordering() == "th":
+            b, k, r, c = input_shape
+            return b, self.channels, r * self.r, c * self.r
+        else:
+            b, r, c, k = input_shape
+            return b, r * self.r, c * self.r, self.channels
+
+    def get_config(self):
+        config = {'r': self.r, 'channels': self.channels}
+        base_config = super(SubPixelUpscaling, self).get_config()
+        return dict(list(base_config.items()) + list(config.items()))

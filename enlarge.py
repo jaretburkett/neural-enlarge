@@ -32,16 +32,24 @@
 import os
 import sys
 import scipy.ndimage
-
 from libs.args import args
 from libs.console import ansi
 from libs.video import enhance_video
-# from libs.enhance import NeuralEnhancer
-from libs.newenhance import NeuralEnhancer
+from libs import old_enhance
+from libs import enhance
+import tensorflow as tf
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
 # Support ansi colors in Windows too.
 if sys.platform == 'win32':
     import colorama
+    colorama.init()
+
+# todo temporary fix until keras training is fully fixed
+if args.train:
+    NeuralEnhancer = old_enhance.NeuralEnhancer
+else:
+    NeuralEnhancer = enhance.NeuralEnhancer
 
 # ----------------------------------------------------------------------------------------------------------------------
 
