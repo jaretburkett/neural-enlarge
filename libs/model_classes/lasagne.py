@@ -36,8 +36,8 @@ class LasagneModel(BaseModel):
         self.setup_generator(self.last_layer(), config)
 
         # todo skip for now
-        # if args.train:
-        #     concatenated = Concatenate([self.network['img'], self.network['out']], axis=0)
+        if args.train:
+            concatenated = Concatenate([self.network['img'], self.network['out']], axis=0)
         #     self.setup_perceptual(concatenated)
         #     self.load_perceptual()
         #     self.setup_discriminator()

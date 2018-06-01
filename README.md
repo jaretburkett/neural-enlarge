@@ -16,7 +16,7 @@ GPU
 ```
 nvidia-docker build -t jaretburkett/neural-enlarge:gpu -f docker-gpu.df .
 ```
-
+****
 #### Make an alias
 For Mac or Linux
 Clone the project, cd into the directory.
