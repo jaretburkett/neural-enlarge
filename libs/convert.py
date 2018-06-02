@@ -57,7 +57,7 @@ def save_keras_as_frozen_tf(model):
     constant_graph = graph_util.convert_variables_to_constants(sess, sess.graph.as_graph_def(), pred_node_names)
     graph_io.write_graph(constant_graph, get_tf_folder_name(), 'model.pb', as_text=False)
 
-    print('TF model saved to %s' % get_tfjs_folder_name())
+    print('TF model saved to %s' % get_tf_folder_name())
 
 
 def save_keras_as_frozen_tfjs(model):

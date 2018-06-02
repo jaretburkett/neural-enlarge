@@ -26,7 +26,7 @@ class DataLoader(threading.Thread):
         super(DataLoader, self).__init__(daemon=True)
         self.data_ready = threading.Event()
         self.data_copied = threading.Event()
-        self.magic = 0.0
+        self.magic = args.train_magic * 1.0
 
         if deblur:
             self.magic = 5.0
@@ -36,8 +36,7 @@ class DataLoader(threading.Thread):
         self.orig_buffer = np.zeros((args.buffer_size, 3, self.orig_shape, self.orig_shape), dtype=np.float32)
         self.seed_buffer = np.zeros((args.buffer_size, 3, self.seed_shape, self.seed_shape), dtype=np.float32)
         print('finding files for %s' % args.train)
-        self.files = glob.glob(os.path.abspath('data/*.jpg'))
-        print(self.files)
+        self.files = glob.glob(os.path.abspath(args.train))
         if len(self.files) == 0:
             error("There were no files found to train from searching for `{}`".format(args.train),
                   "  - Try putting all your images in one folder and using `--train=data/*.jpg`")
