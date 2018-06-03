@@ -1,3 +1,4 @@
+import json
 import keras.backend as K
 from libs.args import args
 from libs.version import __version__
@@ -80,6 +81,24 @@ def save_keras_as_frozen_tfjs(model):
         get_tfjs_folder_name())
 
     print('TFJS model saved to %s' % get_tfjs_folder_name())
+
+    # make config file
+    ib, iw, ih, ic = model.input_shape
+    ob, ow, oh, oc = model.input_shape
+
+    config = {
+        "input": {
+            "name": model.input_names[0],
+            "shape": [None, iw, ih, ic]
+        },
+        "output": {
+            "name": output_names[0],
+            "shape": [None, ow, oh, oc]
+        }
+    }
+
+    with open('%s/config.json' % get_tfjs_folder_name(), 'w') as outfile:
+        json.dump(config, outfile)
 
 
 if __name__ == "__main__":

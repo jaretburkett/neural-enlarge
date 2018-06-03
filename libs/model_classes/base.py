@@ -24,7 +24,7 @@ class BaseModel(object):
         self.n2 = 100
         self.n3 = 200
 
-        self.load_model()
+        # self.load_model()
 
     def make_model(self):
         img_size = args.batch_shape / 2

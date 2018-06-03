@@ -3,6 +3,7 @@ import tensorflow as tf
 import keras.backend as K
 import itertools
 
+
 class SubPixelUpscaling(Layer):
 
     def __init__(self, r, channels, **kwargs):
@@ -24,13 +25,24 @@ class SubPixelUpscaling(Layer):
             out = T.inc_subtensor(out[:, :, y::r, x::r], input[:, r * y + x:: r * r, :, :])
         return out
 
+    def _phase_shift2(self, I, r):
+        bsize, a, b, c = I.get_shape().as_list()
+        bsize = tf.shape(I)[0]  # Handling Dimension(None) type for undefined batch dim
+        X = tf.reshape(I, (bsize, a, b, r, r))
+        X = tf.transpose(X, (0, 1, 2, 4, 3))  # bsize, a, b, 1, 1
+        X = tf.split(X, a, 1)  # a, [bsize, b, r, r]
+        X = tf.concat([tf.squeeze(x, axis=1) for x in X], 2)  # bsize, b, a*r, r
+        X = tf.split(X, b, 1)  # b, [bsize, a*r, r]
+        X = tf.concat([tf.squeeze(x, axis=1) for x in X], 2)  # bsize, a*r, b*r
+        return tf.reshape(X, (bsize, a * r, b * r, 1))
+
     def _phase_shift(self, I, r, batch_size):
         # Helper function with main phase shift operation
         bsize, a, b, c = I.get_shape().as_list()
         X = tf.reshape(I, (batch_size, a, b, r, r))
         X = tf.split(X, a, 1)  # a, [bsize, b, r, r]
         X = tf.concat([tf.squeeze(x) for x in X], 2)  # bsize, b, a*r, r
-        X = tf.split(X, b, 1)  # b, [bsize, a*r, r]
+        X = tf.split(X, b, 0)  # b, [bsize, a*r, r]
         X = tf.concat([tf.squeeze(x) for x in X], 2)  # bsize, a*r, b*r
         return tf.reshape(X, (batch_size, a * r, b * r, 1))
 
@@ -49,14 +61,17 @@ class SubPixelUpscaling(Layer):
             # y = depth_to_scale_th(x, self.r, self.channels)
             y = self._phase_shift_th(x, self.r, self.channels)
         else:
-            batch_size = K.int_shape(x)[0]
+            X = tf.depth_to_space(x, self.r)
+            # batch_size = K.int_shape(x)[0]
             # return self.PS(x, self.r, batch_size)
 
-            Xc = tf.split(x, self.channels, 3)
-            if batch_size:
-                X = tf.concat([self._phase_shift(x, self.r, batch_size) for x in Xc], 3)  # Do the concat RGB
-            else:
-                X = tf.concat([self._phase_shift_test(x, self.r) for x in Xc], 3)  # Do the concat RGB
+            # Xc = tf.split(x, self.channels, 3)
+            # X = tf.concat([self._phase_shift2(x, self.r) for x in Xc], 3)
+
+            # if batch_size:
+            #     X = tf.concat([self._phase_shift(x, self.r, batch_size) for x in Xc], 3)  # Do the concat RGB
+            # else:
+            #     X = tf.concat([self._phase_shift_test(x, self.r) for x in Xc], 3)  # Do the concat RGB
             return X
         return y
 
