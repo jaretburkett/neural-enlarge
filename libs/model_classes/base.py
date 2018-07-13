@@ -83,6 +83,10 @@ class BaseModel(object):
         filename = 'models/ne%ix-%s-%s-%s.h5' % (args.zoom, args.type, args.model, __version__)
         return os.path.abspath(filename) if absolute else filename
 
+    def get_config_filename(self, absolute=False):
+        filename = 'models/ne%ix-%s-%s-%s.config.pkl' % (args.zoom, args.type, args.model, __version__)
+        return os.path.abspath(filename) if absolute else filename
+
     def save(self):
         print('Saving model to %s' % self.get_filename())
         self.model.save(self.get_filename(absolute=True))
